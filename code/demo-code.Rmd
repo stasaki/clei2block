@@ -1,0 +1,96 @@
+---
+title: "Demo script to run clei2block"
+output: html_notebook
+---
+
+Please make sure the system is equipped with Nvidia GPU and has docker installed. 
+
+Assume this R Notebook is located at clei2block/code and there is the demo-data directory at clei2block/. 
+
+### Training clei2block model
+With Nvidia Tesla T4 GPU, training the model takes about 3 minutes.
+
+clei2block.py \<path to input data\> \<path to output\> \<dimensionality of the latent space\> \<dimensionality of hidden layer\> \<if you want to apply the model to other data specify the path to the data (Optional)\> \<feature for lateral embedding\> \<features for linear regression\>
+```{bash}
+time docker run --rm --gpus all -v $(pwd)/../:/var  pytorch/pytorch:1.2-cuda10.0-cudnn7-runtime python /var/functions/clei2block.py /var/demo-data/ /var/demo-out/ 100 800 none mRNA mRNA
+```
+
+
+#### We check if the loss is decreased as expected.
+```{r}
+#install.packages("tidyverse")
+library(tidyverse)
+
+# collect training loss
+list.files("../demo-out/",pattern = "train_loss.txt",full.names = TRUE,recursive = TRUE)%>%
+  lapply(., function(x){
+    read.delim(x,sep = ",",header = F)%>%
+      mutate(trial=dirname(x)%>%basename(),
+             step=1:n())%>%
+      dplyr::select(trial,step,train_loss = V1)%>%
+      return()
+  })%>%
+  bind_rows() -> loss_ds
+
+# collect validation loss
+list.files("../demo-out/",pattern = "valid_loss.txt",full.names = TRUE,recursive = TRUE)%>%
+  lapply(., function(x){
+    read.delim(x,sep = ",",header = F)%>%
+      mutate(trial=dirname(x)%>%basename(),
+             step=1:n())%>%
+      dplyr::select(trial,step,valid_loss = V1)%>%
+      return()
+  })%>%
+  bind_rows()%>%
+  inner_join(loss_ds,.,by=c("trial","step"))%>%
+  group_by(trial)%>%
+  filter(1:n() <= which(valid_loss==min(valid_loss)))-> loss_ds
+
+loss_ds%>%gather(loss_type,loss,-trial,-step)%>%
+    ggplot(.,aes(as.factor(step),loss,color=loss_type))+
+  geom_boxplot()+
+  xlab("Training epochs")
+```
+#### Check the model performance for testing data
+```{r,fig.width=5}
+
+# collect test prediction
+list.files("../demo-out/",pattern = "test_prediction.txt.gz",full.names = TRUE,recursive = TRUE)%>%
+  lapply(., function(x){
+    read.delim(x,sep = "\t",header = F)%>%
+      as.matrix()%>%
+      t()%>%
+      return()
+  }) -> pred_protein
+
+# consensus prediction
+for(i in 2:length(pred_protein)){
+  pred_protein[1][[1]]=pred_protein[1][[1]]+pred_protein[i][[1]]
+}
+pred_protein = pred_protein[1][[1]] # this is a protein by sample matrix predicted by the clei2block model
+
+
+# read actual measurements
+acutal_protein = read.delim("../demo-data2/test_y.txt.gz",header = F)%>%as.matrix()
+acutal_mRNA = read.delim("../demo-data2/test_lr_x_mRNA.txt.gz",header = F)%>%as.matrix()
+
+# calculate correlation between predicted protein and acutal protein measurement for each gene across samples
+lapply(1:nrow(acutal_protein), function(i){
+  cor(pred_protein[i,],acutal_protein[i,])
+})%>%unlist() -> pre_cor
+
+# calculate correlation between acutal protein measurement and thier corresponding mRNA for each gene across samples
+lapply(1:nrow(acutal_protein), function(i){
+  cor(acutal_mRNA[i,],acutal_protein[i,])
+})%>%unlist() -> mRNA_cor
+
+# visualize correlation
+ds = data.frame(cor=pre_cor,
+           data = "predicted protein")
+ds = bind_rows(data.frame(cor=mRNA_cor,
+           data = "actual mRNA"),ds)
+ds%>%
+  ggplot(.,aes(data,cor,fill=data))+
+  geom_boxplot()+ylab("Correlation with actual protein")
+```
+
