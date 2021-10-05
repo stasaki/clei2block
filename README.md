@@ -52,7 +52,7 @@ Inputs
     * `train_y_col.txt.gz`: sample id
     * `train_y_row.txt.gz`: gene id
 
-Sample order must be identical for all inputs. Gene order must be identical for linear regression inputs and protein outcome. Test data should follow the same format, but the file name begins with `test` instead of `training`. 
+Sample order must be identical for all inputs. Gene order must be identical for linear regression inputs and protein outcome. Test data should follow the same format, but the file name begins with `test` instead of `train`. 
 
 Run clei2blck model with the demo data through docker
 
