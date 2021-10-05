@@ -11,7 +11,6 @@ import copy
 import sys
 import pandas as pd
 import shap
-import subprocess
 import math
 
 class Dataset(data.Dataset):
@@ -44,11 +43,9 @@ class Q(nn.Module):
         h = self.fc1(X)
         h = self.bn1(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
         
         z_mu = self.fc_mu(h)
         z_var = self.fc_var(h)
@@ -67,13 +64,11 @@ class P(nn.Module):
         h = self.fc1(z)
         h = self.bn1(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h3 = nn.Dropout(p=0.5)(h)
-        X = self.fc3(h3)
-        return X, h3
+        X = self.fc3(h)
+        return X, h
     
 def sample_z(mu, log_var, n_sample):
     eps = Variable(torch.randn(n_sample, Z_dim)).cuda()
@@ -91,8 +86,7 @@ class VAE(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         for i in range(n_mat):
             X_sample = X_mat[i]*self.weight[i]+X_sample
         X_sample = self.bn(X_sample)
@@ -110,12 +104,32 @@ class VAE_3(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat1, X_mat2, X_mat3):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         X_sample = X_mat1*self.weight[0]+X_sample
         X_sample = X_mat2*self.weight[1]+X_sample
         X_sample = X_mat3*self.weight[2]+X_sample
         X_sample = self.bn(X_sample)
+        return X_sample
+
+class VAE_3_norm(nn.Module):
+    def __init__(self,n_mat,init_method,norm_mean,norm_std):
+        super(VAE_3_norm,self).__init__()
+        self.Q = Q()
+        self.P = P()
+        self.weight=nn.ParameterList([nn.Parameter(init_param([1,y_dim],init_method),requires_grad=True) for i in range(n_mat)])
+        if use_train_scale == "TRUE":
+            self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=True)
+        elif use_train_scale == "FALSE":
+            self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
+        self.norm_mean=norm_mean
+        self.norm_std=norm_std
+    def forward(self, X, X_mat1, X_mat2, X_mat3):
+        z_mu, z_var = self.Q(X)
+        X_sample, h = self.P(z_mu)
+        X_sample = X_mat1*self.weight[0]+X_sample
+        X_sample = X_mat2*self.weight[1]+X_sample
+        X_sample = X_mat3*self.weight[2]+X_sample
+        X_sample = (X_sample-self.norm_mean)/self.norm_std
         return X_sample
         
 class VAE_2(nn.Module):
@@ -130,11 +144,30 @@ class VAE_2(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat1, X_mat2):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         X_sample = X_mat1*self.weight[0]+X_sample
         X_sample = X_mat2*self.weight[1]+X_sample
         X_sample = self.bn(X_sample)
+        return X_sample
+
+class VAE_2_norm(nn.Module):
+    def __init__(self,n_mat,init_method,norm_mean,norm_std):
+        super(VAE_2_norm,self).__init__()
+        self.Q = Q()
+        self.P = P()
+        self.weight=nn.ParameterList([nn.Parameter(init_param([1,y_dim],init_method),requires_grad=True) for i in range(n_mat)])
+        if use_train_scale == "TRUE":
+            self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=True)
+        elif use_train_scale == "FALSE":
+            self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
+        self.norm_mean=norm_mean
+        self.norm_std=norm_std
+    def forward(self, X, X_mat1, X_mat2):
+        z_mu, z_var = self.Q(X)
+        X_sample, h = self.P(z_mu)
+        X_sample = X_mat1*self.weight[0]+X_sample
+        X_sample = X_mat2*self.weight[1]+X_sample
+        X_sample = (X_sample-self.norm_mean)/self.norm_std
         return X_sample
         
 class VAE_1(nn.Module):
@@ -149,12 +182,30 @@ class VAE_1(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat1):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         X_sample = X_mat1*self.weight[0]+X_sample
         X_sample = self.bn(X_sample)
         return X_sample
-    
+
+class VAE_1_norm(nn.Module):
+    def __init__(self,n_mat,init_method,norm_mean,norm_std):
+        super(VAE_1_norm,self).__init__()
+        self.Q = Q()
+        self.P = P()
+        self.weight=nn.ParameterList([nn.Parameter(init_param([1,y_dim],init_method),requires_grad=True) for i in range(n_mat)])
+        if use_train_scale == "TRUE":
+            self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=True)
+        elif use_train_scale == "FALSE":
+            self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
+        self.norm_mean=norm_mean
+        self.norm_std=norm_std
+    def forward(self, X, X_mat1):
+        z_mu, z_var = self.Q(X)
+        X_sample, h = self.P(z_mu)
+        X_sample = X_mat1*self.weight[0]+X_sample
+        X_sample = (X_sample-self.norm_mean)/self.norm_std
+        return X_sample
+        
 def vae_loss(y_true, y_pred, mu, log_var, alpha):
     return torch.mean(recon_loss(y_true, y_pred) + alpha * kl_loss(mu, log_var))
 
@@ -219,37 +270,32 @@ def scale_prefix(test_x, test_x_mat, train_x_iter_stat, train_x_mat_iter_stat):
         test_x_mat[j] = scale_prefix_sub(test_x_mat[j],train_x_mat_iter_stat[j])
     return test_x, test_x_mat
 
+# =============================== SETTING ====================================
 argv = sys.argv
 argc = len(argv)
 if (argc < 5):
     print ('Usage: python')
     quit()
 inloc = argv[1]
-model_loc = argv[2]
-outloc = argv[3]
-
-vae_input = argv[4]
-#out_index = [int(x) for x in argv[6].split(',')]
-lr_input = argv[5:]
-mb_size = 400
+outloc = argv[2]
+model_loc = argv[3]
+vae_input = argv[4].split(",")
+lr_input = argv[5].split(",")
+mb_size = 4000
 n_mat=len(lr_input)
 init_method = "normal"
 use_train_scale = "FALSE"
 n_gene_shap = 100
-# =============================== DATA LOADING ====================================
-data_split="test"
-test_x = np.genfromtxt(inloc+"/"+data_split+"_vae_x_"+vae_input+".txt.gz")
-test_y = np.genfromtxt(inloc+"/"+data_split+"_y.txt.gz")
-test_x_mat = [np.genfromtxt(inloc+"/"+data_split+"_lr_x_"+v+".txt.gz") for v in lr_input]
 
-# scaling target data
+# =============================== DATA LOADING ====================================
+test_x = [pd.read_csv(inloc+"/test_vae_x_"+v+".txt.gz",sep="\t",header=None).values for v in vae_input]
+test_x = np.concatenate(test_x, axis=0)
+test_x_mat = [pd.read_csv(inloc+"/test_lr_x_"+v+".txt.gz",sep="\t",header=None).values for v in lr_input]
+
+# scaling test data
 test_x_iter = copy.deepcopy(test_x)  
 test_x_mat_iter = copy.deepcopy(test_x_mat)  
-if use_train_scale == "FALSE":
-    test_x_iter, test_x_mat_iter, _, _, = scaling(test_x_iter, test_x_mat_iter)
-elif use_train_scale == "TRUE":
-    test_x_iter, test_x_mat_iter = scale_prefix(test_x_iter, test_x_mat_iter,  test_x_iter_stat, test_x_mat_iter_stat)
-
+test_x_iter, test_x_mat_iter, _, _, = scaling(test_x_iter, test_x_mat_iter)
 
 params = {'batch_size': mb_size,
       'shuffle': False,
@@ -257,8 +303,7 @@ params = {'batch_size': mb_size,
       'pin_memory':True}
 
 train = Dataset(test_x_iter,test_x_mat_iter)
-training_generator = data.DataLoader(train, 
-                                     **params)
+training_generator = data.DataLoader(train,**params)
 X, X_mat = next(iter(training_generator))
 
 X_isnan = torch.isnan(X)
@@ -277,25 +322,24 @@ vae_state = torch.load(model_loc)
 X_dim = vae_state['Q.fc1.weight'].shape[1]
 h_dim = vae_state['Q.fc1.weight'].shape[0]
 Z_dim = vae_state['Q.fc_mu.weight'].shape[0]
-y_dim = 1 #vae_state['P.fc3.weight'].shape[0]
+y_dim = 1
 if n_mat==3:
     vae = VAE_3(n_mat, init_method).float()
+    vae_norm = VAE_3_norm(n_mat, init_method,0,0).float()
 elif n_mat==2:
     vae = VAE_2(n_mat, init_method).float()
+    vae_norm = VAE_2_norm(n_mat, init_method,0,0).float()
 elif n_mat==1:
     vae = VAE_1(n_mat, init_method).float()
+    vae_norm = VAE_1_norm(n_mat, init_method,0,0).float()
 vae.cuda()
 
 # run Grandient Explainer
 shap_store = []
+np.random.seed(1234)
 index = np.random.permutation(vae_state['weight.0'].shape[1])[0:np.min([n_gene_shap,vae_state['weight.0'].shape[1]])]
 
-#shap_raw_store = {}
-#for j in out_index:
-#    shap_raw_store[j]=[]
-
 for i in index:
-    #print(i)
     vae_state_temp = copy.deepcopy(vae_state)
     vae_state_temp['weight.0']=vae_state_temp['weight.0'][:,i:(i+1)]
     vae_state_temp['weight.1']=vae_state_temp['weight.1'][:,i:(i+1)]
@@ -303,23 +347,21 @@ for i in index:
     vae_state_temp['P.fc3.weight']=vae_state_temp['P.fc3.weight'][i:(i+1),:]
     vae.load_state_dict(vae_state_temp)
     
-    e = shap.GradientExplainer(vae,[X, *[x[:,i:(i+1)] for x in X_mat]])
+    # set norm factors
+    pred = vae(X, *[x[:,i:(i+1)] for x in X_mat])[:,0]
+    norm_std = torch.tensor(np.std(pred.cpu().detach().numpy())).cuda()
+    norm_mean = torch.tensor(np.mean(pred.cpu().detach().numpy())).cuda()
+    vae_norm.norm_mean = norm_mean
+    vae_norm.norm_std = norm_std
+    
+    e = shap.GradientExplainer(vae_norm,[X, *[x[:,i:(i+1)] for x in X_mat]])
     shap_values = e.shap_values([X,*[x[:,i:(i+1)] for x in X_mat]], nsamples=200)
     shap_values[0][X_isnan] =  float("NaN")
     for i_mat in range(n_mat):
         shap_values[i_mat+1][X_mat_isnan[i_mat][:,i:(i+1)]] =  float("NaN")
-    #for j in out_index:
-    #    shap_raw_store[j].append(shap_values[0][:,j])
     shap_store.append(np.concatenate([np.nanmean(np.abs(x),axis=0) for x in shap_values]))
 
 # export
 shap_store = pd.DataFrame(np.concatenate([index[:, np.newaxis],np.concatenate([x[:, np.newaxis] for x in shap_store],axis=1).T],axis=1))
 shap_store.columns=['gene_index'] + ["X"+i for i in (np.arange(X.shape[1])+1).astype(str)]+lr_input
-shap_store.to_csv(outloc+'/shap.txt',sep="\t",index=False)
-subprocess.run(['gzip', outloc+"/shap.txt"])
-
-#for j in out_index:
-#    shap_raw_store[j] = pd.DataFrame(np.concatenate([index[:, np.newaxis],np.concatenate([x[:, np.newaxis] for x in shap_raw_store[j]],axis=1).T],axis=1))
-#    shap_raw_store[j].columns =['gene_index'] + ["sample"+i for i in (np.arange(X.shape[0])+1).astype(str)] 
-#    shap_raw_store[j].to_csv(outloc+'/shap_raw_X'+str(j)+'.txt',sep="\t",index=False)
-#    subprocess.run(['gzip', outloc+'/shap_raw_X'+str(j)+'.txt'])
+shap_store.to_pickle(outloc+"/shap.pkl")

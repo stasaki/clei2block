@@ -11,7 +11,7 @@ library(tidyverse)
 clei2block_loc = "./functions/" # available at https://github.com/stasaki/clei2block/functions/
 rosmap_model_loc = "./ROSMAP_model/" # available at https://www.synapse.org/#!Synapse:syn23624087
 data_loc = "./Input_predict_anonymous/" # available at https://www.synapse.org/#!Synapse:syn23667843
-out_loc = "./out/"
+out_loc = "./ROSMAP_model-out-predict/"
 python_loc = "/opt/anaconda3/bin/python" # depends on your enviroment
 
 # Predict ####
@@ -37,10 +37,10 @@ lapply(1:nrow(jobs), function(i){
       sub_out_loc=paste0(out_loc,"/fold",n_split,"/",jobs$fset[i],"/",iter,"/")
       dir.create(sub_out_loc,showWarnings = F,recursive = T)
       
-      if(file.exists(paste0(sub_out_loc,"/y_prediction.txt.gz"))){
+      if(file.exists(paste0(sub_out_loc,"/prediction.npy"))){
         return()
       }
-      cmd = paste0(c(python_loc," ",jobs$script[i],data_loc,sub_out_loc,model_loc,jobs$vae_input[i], unlist(jobs$lr_input[i])),collapse = " ")
+      cmd = paste0(c(python_loc," ",jobs$script[i],data_loc,sub_out_loc,model_loc,jobs$vae_input[i], paste0(unlist(jobs$lr_input[i]),collapse = ",")),collapse = " ")
       write.table(cmd,file=paste0(sub_out_loc,"/cmd.sh"),append = F,quote = F,sep = "\t",row.names = F,col.names = F)
       system(cmd)
     })
@@ -53,13 +53,15 @@ use_samples <- read.delim(paste0(data_loc,"/lr_x_mRNA_col.txt.gz"),header = F)$V
 ensemble_out = paste0(out_loc,"/ensemble/")
 dir.create(ensemble_out,showWarnings = F,recursive = T)
 
+library(reticulate)
+np=import("numpy")
+
 protein_id = readRDS(paste0(data_loc,"protein_id.rds"))
 lapply(1:nrow(jobs), function(i){
   lapply(1:10, function(n_split){
     lapply(0:4, function(iter){
       sub_out_loc=paste0(out_loc,"/fold",n_split,"/",jobs$fset[i],"/",iter,"/")
-      data = data.table::fread(paste0(sub_out_loc,"/y_prediction.txt.gz"),
-                               sep = "\t")%>%
+      data = np$load(paste0(sub_out_loc,"/prediction.npy"))%>%
         as.matrix()%>%t()
       colnames(data) = use_samples
       data = bind_cols(protein_id,as_tibble(data))

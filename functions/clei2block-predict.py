@@ -10,6 +10,7 @@ from torch.utils import data
 import copy
 import math
 import sys
+import pandas as pd
 
 class Dataset(data.Dataset):
     'Characterizes a dataset for PyTorch'
@@ -41,12 +42,9 @@ class Q(nn.Module):
         h = self.fc1(X)
         h = self.bn1(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
-        
         z_mu = self.fc_mu(h)
         z_var = self.fc_var(h)
         return z_mu, z_var
@@ -60,22 +58,15 @@ class P(nn.Module):
         self.fc2 = nn.Linear(h_dim,h_dim,bias=False)
         self.bn2 = nn.BatchNorm1d(h_dim)
         self.fc3 = nn.Linear(h_dim,y_dim,bias=False)
-        #self.fc3 = nn.Linear(h_dim,h_dim,bias=False)
-        #self.bn3 = nn.BatchNorm1d(h_dim, affine=False,track_running_stats=False)
-        #self.fc4 = nn.Linear(h_dim,y_dim,bias=False)
     def forward(self, z):
         h = self.fc1(z)
         h = self.bn1(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h3 = nn.Dropout(p=0.5)(h)
-        X = self.fc3(h3)
-        #h = self.bn3(h3)
-        #X = self.fc4(h)
-        return X, h3
+        X = self.fc3(h)
+        return X, h
     
 def sample_z(mu, log_var, n_sample):
     eps = Variable(torch.randn(n_sample, Z_dim)).cuda()
@@ -93,12 +84,11 @@ class VAE(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         for i in range(n_mat):
             X_sample = X_mat[i]*self.weight[i]+X_sample
         X_sample = self.bn(X_sample)
-        return X_sample#, z, z_mu, z_var, h
+        return X_sample
     
 class VAE_3(nn.Module):
     def __init__(self,n_mat,init_method):
@@ -112,13 +102,13 @@ class VAE_3(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat1, X_mat2, X_mat3):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         X_sample = X_mat1*self.weight[0]+X_sample
         X_sample = X_mat2*self.weight[1]+X_sample
         X_sample = X_mat3*self.weight[2]+X_sample
         X_sample = self.bn(X_sample)
-        return X_sample#, z, z_mu, z_var, h
+        return X_sample
+        
 class VAE_2(nn.Module):
     def __init__(self,n_mat,init_method):
         super(VAE_2,self).__init__()
@@ -131,12 +121,12 @@ class VAE_2(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat1, X_mat2):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         X_sample = X_mat1*self.weight[0]+X_sample
         X_sample = X_mat2*self.weight[1]+X_sample
         X_sample = self.bn(X_sample)
-        return X_sample#, z, z_mu, z_var, h
+        return X_sample
+        
 class VAE_1(nn.Module):
     def __init__(self,n_mat,init_method):
         super(VAE_1,self).__init__()
@@ -149,15 +139,13 @@ class VAE_1(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
     def forward(self, X, X_mat1):
         z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+        X_sample, h = self.P(z_mu)
         X_sample = X_mat1*self.weight[0]+X_sample
         X_sample = self.bn(X_sample)
-        return X_sample#, z, z_mu, z_var, h
+        return X_sample
     
 def vae_loss(y_true, y_pred, mu, log_var, alpha):
     return torch.mean(recon_loss(y_true, y_pred) + alpha * kl_loss(mu, log_var))
-    #return torch.mean(recon_loss(y_true, y_pred)) 
     
 def kl_loss(mu, log_var):
     return 0.5 * torch.sum(torch.exp(log_var) + mu**2 - 1. - log_var,1)
@@ -200,7 +188,6 @@ def scale_sub(train_x_iter):
             train_std[i]=1
         train_x_iter[i,:] = train_x_iter[i,:] / train_std[i]
     return train_x_iter, [train_mean, train_std]
-    
 
 def scaling(test_x, test_x_mat):
     test_x, test_x_stat = scale_sub(test_x)
@@ -231,16 +218,20 @@ if (argc < 5):
 inloc = argv[1]
 outloc = argv[2]
 model_loc = argv[3]
-vae_var = argv[4]
-var_names = argv[5:]
-mb_size = 400
-n_mat=len(var_names)
+vae_input = argv[4].split(",")
+lr_input = argv[5].split(",")
+mb_size = 4000
+n_mat=len(lr_input)
 init_method = "normal"
 use_train_scale = "FALSE"
 
+if not os.path.exists(outloc):
+    os.makedirs(outloc)
+        
 # =============================== DATA LOADING ====================================
-test_x = np.genfromtxt(inloc+"/vae_x_"+vae_var+".txt.gz")
-test_x_mat = [np.genfromtxt(inloc+"/lr_x_"+v+".txt.gz") for v in var_names]
+test_x = [pd.read_csv(inloc+"vae_x_"+v+".txt.gz",sep="\t",header=None).values for v in vae_input]
+test_x = np.concatenate(test_x, axis=0)
+test_x_mat = [pd.read_csv(inloc+"lr_x_"+v+".txt.gz",sep="\t",header=None).values for v in lr_input]
 
 # scaling test data
 test_x_iter = copy.deepcopy(test_x)  
@@ -259,7 +250,7 @@ X, X_mat = next(iter(training_generator))
 
 X_isnan = torch.isnan(X)
 X[X_isnan]=0
-#print(i)
+
 X = X.float().cuda()
 X_mat_isnan=[]
 for i_mat in range(n_mat):
@@ -288,10 +279,5 @@ vae.load_state_dict(vae_state)
 with torch.no_grad():
     vae.eval()
     X_sample = vae(X, *X_mat)
-    with open(outloc+"/y_prediction.txt",'ab') as f:
-        np.savetxt(f, X_sample.detach().cpu().numpy(), delimiter='\t') 
-
-import subprocess
-subprocess.run(['gzip', outloc+"/y_prediction.txt"])
-    
+    np.save(outloc+"prediction.npy", X_sample.detach().cpu().numpy(), allow_pickle=True, fix_imports=True)
         

@@ -11,6 +11,7 @@ import copy
 import math
 import sys
 import subprocess
+import pandas as pd
 
 class Dataset(data.Dataset):
     'Characterizes a dataset for PyTorch'
@@ -40,15 +41,17 @@ class Q(nn.Module):
         self.bn2 = nn.BatchNorm1d(h_dim)
         self.fc_mu = nn.Linear(h_dim,Z_dim)
         self.fc_var = nn.Linear(h_dim,Z_dim)
-    def forward(self, X):
+    def forward(self, X, train=True):
         h = self.fc1(X)
         h = self.bn1(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
+        if train:
+            h = nn.Dropout(p=0.5)(h)
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
+        if train:
+            h = nn.Dropout(p=0.5)(h)
         z_mu = self.fc_mu(h)
         z_var = self.fc_var(h)
         return z_mu, z_var
@@ -62,17 +65,19 @@ class P(nn.Module):
         self.fc2 = nn.Linear(h_dim,h_dim,bias=False)
         self.bn2 = nn.BatchNorm1d(h_dim)
         self.fc3 = nn.Linear(h_dim,y_dim,bias=False)
-    def forward(self, z):
+    def forward(self, z, train=True):
         h = self.fc1(z)
         h = self.bn1(h)
         h = nn.LeakyReLU()(h)
-        h = nn.Dropout(p=0.5)(h)
+        if train:
+            h = nn.Dropout(p=0.5)(h)
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h3 = nn.Dropout(p=0.5)(h)
-        X = self.fc3(h3)
-        return X, h3
+        if train:
+            h = nn.Dropout(p=0.5)(h)
+        X = self.fc3(h)
+        return X, h
     
 def sample_z(mu, log_var, n_sample):
     eps = Variable(torch.randn(n_sample, Z_dim)).cuda()
@@ -88,14 +93,21 @@ class VAE(nn.Module):
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=True)
         elif use_train_scale == "FALSE":
             self.bn = nn.BatchNorm1d(y_dim, affine=False,track_running_stats=False)
-    def forward(self, X, X_mat):
-        z_mu, z_var = self.Q(X)
-        z = sample_z(z_mu, z_var, X.shape[0])
-        X_sample, h = self.P(z)
+    def forward(self, X, X_mat, train=True):
+        z_mu, z_var = self.Q(X,train)
+        if train:
+            z = sample_z(z_mu, z_var, X.shape[0])
+            X_sample, h = self.P(z,train)
+        else:
+            X_sample, h = self.P(z_mu,train)
         for i in range(n_mat):
             X_sample = X_mat[i]*self.weight[i]+X_sample
         X_sample = self.bn(X_sample)
-        return X_sample, z, z_mu, z_var, h
+        
+        if train:
+            return X_sample, z, z_mu, z_var, h
+        else:
+            return X_sample, h
     
 def vae_loss(y_true, y_pred, mu, log_var, alpha):
     return torch.mean(recon_loss(y_true, y_pred) + alpha * kl_loss(mu, log_var))
@@ -174,8 +186,8 @@ outloc = argv[2]
 Z_dim = int(argv[3])
 h_dim = int(argv[4])
 targetloc = argv[5]
-vae_input = argv[6]
-lr_input = argv[7:]
+vae_input = argv[6].split(",")
+lr_input = argv[7].split(",")
 lr_vae = 0.001
 lr_add = 0.01
 alpha = 0.00005  
@@ -188,20 +200,32 @@ init_method = "normal"
 
 # =============================== DATA LOADING ====================================
 data_split="train"
-train_x = np.genfromtxt(inloc+"/"+data_split+"_vae_x_"+vae_input+".txt.gz")
-train_y = np.genfromtxt(inloc+"/"+data_split+"_y.txt.gz")
-train_x_mat = [np.genfromtxt(inloc+"/"+data_split+"_lr_x_"+v+".txt.gz") for v in lr_input]
+train_x = [pd.read_csv(inloc+"/"+data_split+"_vae_x_"+v+".txt.gz",sep="\t",header=None).values for v in vae_input]
+train_x = np.concatenate(train_x, axis=0)
+train_y = pd.read_csv(inloc+"/"+data_split+"_y.txt.gz",sep="\t",header=None).values
+train_x_mat = [pd.read_csv(inloc+"/"+data_split+"_lr_x_"+v+".txt.gz",sep="\t",header=None).values for v in lr_input]
 
 data_split="test"
-test_x = np.genfromtxt(inloc+"/"+data_split+"_vae_x_"+vae_input+".txt.gz")
-test_y = np.genfromtxt(inloc+"/"+data_split+"_y.txt.gz")
-test_x_mat = [np.genfromtxt(inloc+"/"+data_split+"_lr_x_"+v+".txt.gz") for v in lr_input]
+test_x = [pd.read_csv(inloc+"/"+data_split+"_vae_x_"+v+".txt.gz",sep="\t",header=None).values for v in vae_input]
+test_x = np.concatenate(test_x, axis=0)
+test_y = pd.read_csv(inloc+"/"+data_split+"_y.txt.gz",sep="\t",header=None).values
+test_x_mat = [pd.read_csv(inloc+"/"+data_split+"_lr_x_"+v+".txt.gz",sep="\t",header=None).values for v in lr_input]
 
 
 if targetloc!="none":
-    target_x = np.genfromtxt(targetloc+"/vae_x_"+vae_input+".txt.gz")
-    target_y = np.genfromtxt(targetloc+"/y.txt.gz")
-    target_x_mat = [np.genfromtxt(targetloc+"/lr_x_"+v+".txt.gz") for v in lr_input]
+    target_x = [pd.read_csv(targetloc+"/vae_x_"+v+".txt.gz",sep="\t",header=None).values for v in vae_input]
+    target_x = np.concatenate(target_x, axis=0)
+    target_y = pd.read_csv(targetloc+"/y.txt.gz",sep="\t",header=None).values
+    target_x_mat = [pd.read_csv(targetloc+"/lr_x_"+v+".txt.gz",sep="\t",header=None).values for v in lr_input]
+    
+    # scaling target data
+    target_x_iter = copy.deepcopy(target_x)  
+    target_y_iter = copy.deepcopy(target_y)  
+    target_x_mat_iter = copy.deepcopy(target_x_mat)  
+    if use_train_scale == "FALSE":
+        target_x_iter, target_y_iter, target_x_mat_iter, _, _, _ = scaling(target_x_iter, target_y_iter, target_x_mat_iter)
+    elif use_train_scale == "TRUE":
+        target_x_iter, target_y_iter, target_x_mat_iter = scale_prefix(target_x_iter, target_y_iter, target_x_mat_iter,  train_x_iter_stat, train_y_iter_stat, train_x_mat_iter_stat)
 
 
 X_dim = train_x.shape[0]
@@ -244,7 +268,6 @@ def run(outloc):
         train_loss_r=0
         train_loss_k=0 
         for i,(X, X_mat, Y) in enumerate(training_generator):
-            #print(i)
             X = X.float().cuda()
             Y = Y.float().cuda()
             for i_mat in range(n_mat):
@@ -253,7 +276,7 @@ def run(outloc):
                 
             # Model computation
             optimizer.zero_grad()   # zero the gradient buffers
-            X_sample, z, z_mu, z_var, h = vae(X, X_mat)
+            X_sample, z, z_mu, z_var, h = vae(X, X_mat, train=True)
 
             X_sample[torch.isnan(Y)]=0
             Y[torch.isnan(Y)]=0
@@ -289,7 +312,7 @@ def run(outloc):
                         X_mat[i_mat][torch.isnan(X_mat[i_mat])]=0
                         X_mat[i_mat] = X_mat[i_mat].float().cuda()
 
-                    X_sample, z, z_mu, z_var, h = vae(X, X_mat)
+                    X_sample, z, z_mu, z_var, h = vae(X, X_mat, train=True)
                     X_sample[torch.isnan(Y)]=0
                     Y[torch.isnan(Y)]=0
                     # Loss
@@ -370,7 +393,7 @@ for it_val in range(5):
     vae.cuda()
     vae.load_state_dict(torch.load(outloc+str(it_val)+"/"+'/trained_model.pt'))
     
-    params = {'batch_size': mb_size,
+    params = {'batch_size': 5000,
           'shuffle': False,
           'num_workers': 0,
           'pin_memory':True}
@@ -378,52 +401,26 @@ for it_val in range(5):
     # predict testing data
     with torch.no_grad():
         train = Dataset(test_x_iter,test_y_iter,test_x_mat_iter)
-        training_generator = data.DataLoader(train, 
-                                             **params)
+        training_generator = data.DataLoader(train, **params)
         vae.eval()
-        for i,(X, X_mat, Y) in enumerate(training_generator):
+        X, X_mat, Y = next(iter(training_generator))
+        X = X.float().cuda()
+        for i_mat in range(n_mat):
+            X_mat[i_mat][torch.isnan(X_mat[i_mat])]=0
+            X_mat[i_mat] = X_mat[i_mat].float().cuda()
+        X_sample, h = vae(X, X_mat, train=False)
+    np.save(outloc+str(it_val)+"/test_prediction.npy", X_sample.detach().cpu().numpy(), allow_pickle=True, fix_imports=True)
+    
+    # predict target data
+    if targetloc!="none":
+        with torch.no_grad():
+            train = Dataset(target_x_iter,target_y_iter,target_x_mat_iter)
+            training_generator = data.DataLoader(train, **params)
+            vae.eval()
+            X, X_mat, Y = next(iter(training_generator))
             X = X.float().cuda()
             for i_mat in range(n_mat):
                 X_mat[i_mat][torch.isnan(X_mat[i_mat])]=0
                 X_mat[i_mat] = X_mat[i_mat].float().cuda()
-            X_sample, z, z_mu, z_var, h = vae(X, X_mat)
-            with open(outloc+str(it_val)+"/test_prediction.txt",'ab') as f:
-                np.savetxt(f, X_sample.detach().cpu().numpy(), delimiter='\t') 
-    subprocess.run(['gzip', outloc+str(it_val)+"/test_prediction.txt"])
-    
-    # predict target data
-    if targetloc!="none":
-        # scaling target data
-        target_x_iter = copy.deepcopy(target_x)  
-        target_y_iter = copy.deepcopy(target_y)  
-        target_x_mat_iter = copy.deepcopy(target_x_mat)  
-        if use_train_scale == "FALSE":
-            target_x_iter, target_y_iter, target_x_mat_iter, _, _, _ = scaling(target_x_iter, target_y_iter, target_x_mat_iter)
-        elif use_train_scale == "TRUE":
-            target_x_iter, target_y_iter, target_x_mat_iter = scale_prefix(target_x_iter, target_y_iter, target_x_mat_iter,  train_x_iter_stat, train_y_iter_stat, train_x_mat_iter_stat)
-            
-        with torch.no_grad():
-            train = Dataset(target_x_iter,target_y_iter,target_x_mat_iter)
-            training_generator = data.DataLoader(train, 
-                                                 **params)
-            h_all = torch.tensor([])
-            X_sample_all = torch.tensor([])
-            vae.eval()
-            for i,(X, X_mat, Y) in enumerate(training_generator):
-                X = X.float().cuda()
-                for i_mat in range(n_mat):
-                    X_mat[i_mat][torch.isnan(X_mat[i_mat])]=0
-                    X_mat[i_mat] = X_mat[i_mat].float().cuda()
-                X_sample, z, z_mu, z_var, h = vae(X, X_mat)
-                h_all = torch.cat((h_all,h.cpu()),0)
-        for i_mat in range(n_mat):
-            target_x_mat_iter[i_mat][np.isnan(target_x_mat_iter[i_mat])]=0
-            target_x_mat_iter[i_mat] = torch.tensor(target_x_mat_iter[i_mat]).float().transpose(0,1)
-        X_sample = vae.P.fc3(h_all.cuda())
-        X_sample = X_sample.cpu()
-        for i in range(n_mat):
-            X_sample = target_x_mat_iter[i]*vae.weight[i].cpu() + X_sample
-        X_sample = vae.bn(X_sample.cuda()).cpu()
-        with open(outloc+str(it_val)+"/target_prediction.txt",'ab') as f:
-            np.savetxt(f, X_sample.detach().cpu().numpy(), delimiter='\t') 
-        subprocess.run(['gzip', outloc+str(it_val)+"/target_prediction.txt"])
+            X_sample, h = vae(X, X_mat, train=False)
+        np.save(outloc+str(it_val)+"/target_prediction.npy", X_sample.detach().cpu().numpy(), allow_pickle=True, fix_imports=True)

@@ -10,7 +10,7 @@ library(tidyverse)
 # Please specify file location ####
 clei2block_loc = "./functions/" # available at https://github.com/stasaki/clei2block/functions/
 data_loc = "./Input_train_anonymous/" # available at https://www.synapse.org/#!Synapse:syn23667887
-out_loc = "./out/"
+out_loc = "./ROSMAP_model-out/"
 python_loc = "/opt/anaconda3/bin/python" # depends on your enviroment
 
 
@@ -34,11 +34,11 @@ lapply(1:nrow(jobs),
        function(n_job){
          sub_out_loc=paste0(out_loc,paste0(jobs$lr_name[n_job],"_",jobs$vae_input[n_job]),"/")
          dir.create(sub_out_loc,showWarnings = F,recursive = T)
-         if(file.exists(paste0(sub_out_loc,"/4/test_prediction.txt.gz"))){
+         if(file.exists(paste0(sub_out_loc,"/4/test_prediction.npy"))){
            return()
          }
          cmd = paste0(c(python_loc," ",jobs$script[n_job],data_loc,sub_out_loc,Z_dim,h_dim,
-                        "none", jobs$vae_input[n_job], unlist(jobs$lr_input[n_job])),collapse = " ")
+                        "none", jobs$vae_input[n_job], paste0(unlist(jobs$lr_input[n_job]),collapse = ",")),collapse = " ")
          write.table(cmd,file=paste0(sub_out_loc,"/cmd.sh"),append = F,quote = F,sep = "\t",row.names = F,col.names = F)
          system(cmd)
        })
@@ -59,23 +59,25 @@ protein_id = paste0(data_loc,"/test_y_row.txt.gz")%>%
 ensemble_out = paste0(out_loc,"/ensemble/")
 dir.create(ensemble_out,showWarnings = F,recursive = T)
 
+library(reticulate)
+np=import("numpy")
+
 lapply(1:nrow(jobs), function(n_job){
     lapply(0:4, function(iter){
       sub_out_loc=paste0(out_loc,paste0(jobs$lr_name[n_job],"_",jobs$vae_input[n_job]),"/",iter,"/")
-      data = data.table::fread(paste0(sub_out_loc,"/test_prediction.txt.gz"),
-                               sep = "\t")%>%
+      data = np$load(paste0(sub_out_loc,"/test_prediction.npy"))%>%
         as.matrix()%>%t()
       colnames(data) = use_samples
       data = bind_cols(protein_id,as_tibble(data))
       data%>%
-        gather(SAMPLE.ID,pred,-V1,-V2)%>%
+        gather(SAMPLE.ID,pred,-probe_id,-gene_id)%>%
         return()
     })%>%bind_rows()%>%
-      group_by(V1,V2,SAMPLE.ID)%>%
+      group_by(probe_id,gene_id,SAMPLE.ID)%>%
       summarise(pred=mean(pred))%>%
       return()
 })%>%bind_rows()%>%
-  group_by(V1,V2,SAMPLE.ID)%>%
+  group_by(probe_id,gene_id,SAMPLE.ID)%>%
   summarise(pred=mean(pred)) -> data
 saveRDS(object = data,file = paste0(ensemble_out,"predicted_proteome.rds"))
 

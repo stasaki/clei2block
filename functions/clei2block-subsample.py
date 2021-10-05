@@ -73,10 +73,8 @@ class P(nn.Module):
         h = self.fc2(h)
         h = self.bn2(h)
         h = nn.LeakyReLU()(h)
-        h3 = nn.Dropout(p=0.5)(h)
-        X = self.fc3(h3)
-        #h = self.bn3(h3)
-        #X = self.fc4(h)
+        h = nn.Dropout(p=0.5)(h)
+        X = self.fc3(h)
         return X, h3
     
 def sample_z(mu, log_var, n_sample):
