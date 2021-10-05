@@ -33,7 +33,7 @@ Change current working directory to clei2block
 
     cd clei2block 
     
-Command line arguments for clei2block are as follows 
+Command-line arguments for clei2block are as follows 
 
     python clei2block.py <path to input data> <path to output> <dimensionality of the latent space> <dimensionality of hidden layer> <if you want to apply the model to other data specify the path to the data (Optional)> <input features for latent embedding> <input features for linear regression>
 
@@ -54,19 +54,19 @@ Inputs
     * `train_y_col.txt.gz`: sample id
     * `train_y_row.txt.gz`: gene id
 
-Sample order must be identical for all inputs. Gene order must be identical for linear regression inputs and protein outcome. Test data should follow the same format, but the file name begins with `test` instead of `train`. 
+Sample orders must be identical for all inputs. Gene orders must be identical for linear regression inputs and protein outcomes. Test data should follow the same format, but the file name begins with `test` instead of `train`.
 
 Run clei2blck model with the demo data through docker
 
     time docker run --rm --gpus all -v $(pwd)/../:/var  pytorch/pytorch:1.2-cuda10.0-cudnn7-runtime  /bin/bash -c "pip install pandas; python /var/functions/clei2block.py /var/demo-data/ /var/demo-out/ 100 800 none mRNA mRNA"
     
-The training the model takes about 3 minutes. This script run clei2block 5 times and the results will be in subdirectories from `0` to `4`. In each subdirectory, you will see the following outputs.
+The training of the model takes about 3 minutes. This script runs clei2block 5 times and the results will be in subdirectories from `0` to `4`. In each subdirectory, you will see the following outputs.
 
   * `trained_model.pt`: trained pytorch model
   * `train_loss.txt`: loss for training data
   * `valid_loss.txt`: loss for validation data
   * `val_index.txt`: sample index used for validation data
-  * `test_prediction.npy`: predicted protein values for testing data stored as numpy array
+  * `test_prediction.npy`: predicted protein values for testing data stored as NumPy array
   
 ### Check if the loss is decreased as expected
 Launch R
@@ -165,22 +165,22 @@ ds%>%
   geom_boxplot()+ylab("Correlation with actual protein")
 ```
 
-How to use a pretrained model
+How to use a pre-trained model
 ============
 
-You can use a pretrined model with the following command. 
+You can use a pre-trained model with the following command. 
 
     python clei2block-predict.py <path to input data> <path to output> <path to pretrained model> <input features for latent embedding> <input features for linear regression> 
     
-The order of input variables must be identical with the input used to train the model. Also if you use multiple data files for the input of latent embedding or linear regression, the order of files in the command must be identical with the training.
+The order of input variables must be identical to the input used to train the model. Also if you use multiple data files for the input of latent embedding or linear regression, the order of files in the command must be identical with the training.
 
-To apply a pretrained model to the demo-data through docker, run the following command.
+To apply a pre-trained model to the demo data through docker, run the following command.
 
     time docker run --rm --gpus all -v $(pwd)/../:/var  pytorch/pytorch:1.2-cuda10.0-cudnn7-runtime  /bin/bash -c "pip install pandas; python /var/functions/clei2block-predict.py /var/demo-data/test_ /var/demo-out-predict/ /var/demo-out/0/trained_model.pt mRNA mRNA"
     
-The training the model takes about 3 minutes. You will see the following outputs.
+The training of the model takes about 3 minutes. You will see the following outputs.
 
-  * `predicton.npy`: predicted protein values stored as numpy array
+  * `prediction.npy`: predicted protein values stored as NumPy array
   
 Download models trained with ROSMAP brain data
 ============
