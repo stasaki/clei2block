@@ -24,7 +24,7 @@ Installation
 Working on a demo data
 ============
 
-R notebook for this tutorial is available [here](https://www.docker.com/whatisdocker/).
+R notebook for this tutorial is available at `code/demo-code.html` and the expected outcome is `code/demo-code-expected-output.nb.html`
 
 ### Training model
 Change current working directory to clei2block
@@ -38,19 +38,19 @@ Command line arguments for clei2block are as follows
 Inputs
 
   * latent embedding
-    * train_vae_x_mRNA.txt.gz: input feature matrix for latent embedding (gene x sample)
-    * train_vae_x_mRNA_col.txt.gz: sample id
-    * train_vae_x_mRNA_row.txt.gz: gene id
+    * `train_vae_x_mRNA.txt.gz`: input feature matrix for latent embedding (gene x sample)
+    * `train_vae_x_mRNA_col.txt.gz`: sample id
+    * `train_vae_x_mRNA_row.txt.gz`: gene id
 
   * linear regression module
-    * train_lr_x_mRNA.txt.gz: input feature matrix for linear regression (gene x sample)
-    * train_lr_x_mRNA_col.txt.gz: sample id
-    * train_lr_x_mRNA_row.txt.gz: gene id
+    * `train_lr_x_mRNA.txt.gz`: input feature matrix for linear regression (gene x sample)
+    * `train_lr_x_mRNA_col.txt.gz`: sample id
+    * `train_lr_x_mRNA_row.txt.gz`: gene id
 
   * protein outcome
-    * train_y.txt.gz: actual protein matrix (gene x sample)
-    * train_y_col.txt.gz: sample id
-    * train_y_row.txt.gz: gene id
+    * `train_y.txt.gz`: actual protein matrix (gene x sample)
+    * `train_y_col.txt.gz`: sample id
+    * `train_y_row.txt.gz`: gene id
 
 Sample order must be identical for all inputs. Gene order must be identical for linear regression inputs and protein outcome. Test data should follow the same format, but the file name begins with `test` instead of `training`. 
 
@@ -60,11 +60,11 @@ Run clei2blck model with the demo data through docker
     
 The training the model takes about 3 minutes. This script run clei2block 5 times and the results will be in subdirectories from `0` to `4`. In each subdirectory, you will see the following outputs.
 
-  * trained_model.pt: trained pytorch model
-  * train_loss.txt: loss for training data
-  * valid_loss.txt: loss for validation data
-  * val_index.txt: sample index used for validation data
-  * test_prediction.npy: predicted protein values for testing data stored as numpy array
+  * `trained_model.pt`: trained pytorch model
+  * `train_loss.txt`: loss for training data
+  * `valid_loss.txt`: loss for validation data
+  * `val_index.txt`: sample index used for validation data
+  * `test_prediction.npy`: predicted protein values for testing data stored as numpy array
   
 ### Check if the loss is decreased as expected
 Launch R
@@ -178,7 +178,7 @@ To apply a pretrained model to the demo-data through docker, run the following c
     
 The training the model takes about 3 minutes. You will see the following outputs.
 
-  * predicton.npy: predicted protein values stored as numpy array
+  * `predicton.npy`: predicted protein values stored as numpy array
   
 Download models trained with ROSMAP brain data
 ============
@@ -203,7 +203,7 @@ You can programmatically download data and models via Synapse API client
     synapse get -r syn23667887
     cd ..
 
-You can build or use ROSMAP clei2block model using [train.R](https://www.docker.com/whatisdocker/) and [predict.R](https://www.docker.com/whatisdocker/).
+You can build or use ROSMAP clei2block model using `code/train.R` and `code/predict.R`.
 
 Access to ROSMAP/MSBB brain data
 ============

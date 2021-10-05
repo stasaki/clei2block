@@ -379,7 +379,7 @@ pre code {
 </div>
 <div id="working-on-a-demo-data" class="section level1">
 <h1>Working on a demo data</h1>
-<p>R notebook for this tutorial is available <a href="https://www.docker.com/whatisdocker/">here</a>.</p>
+<p>R notebook for this tutorial is available at <code>code/demo-code.html</code> and the expected outcome is <code>code/demo-code-expected-output.nb.html</code></p>
 <div id="training-model" class="section level3">
 <h3>Training model</h3>
 <p>Change current working directory to clei2block</p>
@@ -390,21 +390,21 @@ pre code {
 <ul>
 <li>latent embedding
 <ul>
-<li>train_vae_x_mRNA.txt.gz: input feature matrix for latent embedding (gene x sample)</li>
-<li>train_vae_x_mRNA_col.txt.gz: sample id</li>
-<li>train_vae_x_mRNA_row.txt.gz: gene id</li>
+<li><code>train_vae_x_mRNA.txt.gz</code>: input feature matrix for latent embedding (gene x sample)</li>
+<li><code>train_vae_x_mRNA_col.txt.gz</code>: sample id</li>
+<li><code>train_vae_x_mRNA_row.txt.gz</code>: gene id</li>
 </ul></li>
 <li>linear regression module
 <ul>
-<li>train_lr_x_mRNA.txt.gz: input feature matrix for linear regression (gene x sample)</li>
-<li>train_lr_x_mRNA_col.txt.gz: sample id</li>
-<li>train_lr_x_mRNA_row.txt.gz: gene id</li>
+<li><code>train_lr_x_mRNA.txt.gz</code>: input feature matrix for linear regression (gene x sample)</li>
+<li><code>train_lr_x_mRNA_col.txt.gz</code>: sample id</li>
+<li><code>train_lr_x_mRNA_row.txt.gz</code>: gene id</li>
 </ul></li>
 <li>protein outcome
 <ul>
-<li>train_y.txt.gz: actual protein matrix (gene x sample)</li>
-<li>train_y_col.txt.gz: sample id</li>
-<li>train_y_row.txt.gz: gene id</li>
+<li><code>train_y.txt.gz</code>: actual protein matrix (gene x sample)</li>
+<li><code>train_y_col.txt.gz</code>: sample id</li>
+<li><code>train_y_row.txt.gz</code>: gene id</li>
 </ul></li>
 </ul>
 <p>Sample order must be identical for all inputs. Gene order must be identical for linear regression inputs and protein outcome. Test data should follow the same format, but the file name begins with <code>test</code> instead of <code>training</code>.</p>
@@ -412,11 +412,11 @@ pre code {
 <pre><code>time docker run --rm --gpus all -v $(pwd)/../:/var  pytorch/pytorch:1.2-cuda10.0-cudnn7-runtime  /bin/bash -c &quot;pip install pandas; python /var/functions/clei2block.py /var/demo-data/ /var/demo-out/ 100 800 none mRNA mRNA&quot;</code></pre>
 <p>The training the model takes about 3 minutes. This script run clei2block 5 times and the results will be in subdirectories from <code>0</code> to <code>4</code>. In each subdirectory, you will see the following outputs.</p>
 <ul>
-<li>trained_model.pt: trained pytorch model</li>
-<li>train_loss.txt: loss for training data</li>
-<li>valid_loss.txt: loss for validation data</li>
-<li>val_index.txt: sample index used for validation data</li>
-<li>test_prediction.npy: predicted protein values for testing data stored as numpy array</li>
+<li><code>trained_model.pt</code>: trained pytorch model</li>
+<li><code>train_loss.txt</code>: loss for training data</li>
+<li><code>valid_loss.txt</code>: loss for validation data</li>
+<li><code>val_index.txt</code>: sample index used for validation data</li>
+<li><code>test_prediction.npy</code>: predicted protein values for testing data stored as numpy array</li>
 </ul>
 </div>
 <div id="check-if-the-loss-is-decreased-as-expected" class="section level3">
@@ -519,7 +519,7 @@ ds%&gt;%
 <pre><code>time docker run --rm --gpus all -v $(pwd)/../:/var  pytorch/pytorch:1.2-cuda10.0-cudnn7-runtime  /bin/bash -c &quot;pip install pandas; python /var/functions/clei2block-predict.py /var/demo-data/test_ /var/demo-out-predict/ /var/demo-out/0/trained_model.pt mRNA mRNA&quot;</code></pre>
 <p>The training the model takes about 3 minutes. You will see the following outputs.</p>
 <ul>
-<li>predicton.npy: predicted protein values stored as numpy array</li>
+<li><code>predicton.npy</code>: predicted protein values stored as numpy array</li>
 </ul>
 </div>
 <div id="download-models-trained-with-rosmap-brain-data" class="section level1">
@@ -542,7 +542,7 @@ mkdir Input_train_anonymous
 cd Input_train_anonymous
 synapse get -r syn23667887
 cd ..</code></pre>
-<p>You can build or use ROSMAP clei2block model using <a href="https://www.docker.com/whatisdocker/">train.R</a> and <a href="https://www.docker.com/whatisdocker/">predict.R</a>.</p>
+<p>You can build or use ROSMAP clei2block model using <code>code/train.R</code> and <code>code/predict.R</code>.</p>
 </div>
 <div id="access-to-rosmapmsbb-brain-data" class="section level1">
 <h1>Access to ROSMAP/MSBB brain data</h1>
