@@ -8,6 +8,8 @@ What is clei2block?
 
 `clei2block` is a method to predict protein abundance across samples from RNA-seq data. Due to the complexity of gene regulation, the discrepancy between mRNA and protein levels has been a standing question since both genome-wide measurements became available. There are two types of mRNA-vs-protein relationships: (i) across genes within a sample (ii) across samples for each gene. Our method models the latter relationship using deep-neural networks.
 
+![Project overview](overview.png)
+
 Installation
 ============
 
