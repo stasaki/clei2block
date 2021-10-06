@@ -15,7 +15,7 @@ Installation
 
 ### Requirements
 
-  * A system equipped with Nvidia GPU
+  * A Linux system equipped with Nvidia GPU
   * [Docker](https://www.docker.com/whatisdocker/)
   * [R](https://www.r-project.org) version 3.6.2 or later
   
