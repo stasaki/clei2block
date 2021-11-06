@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/316649720.svg)](https://zenodo.org/badge/latestdoi/316649720)
+
 clei2block: deep-neural protein translation
 ========
 ![clei2block Logo](logo1.png)
