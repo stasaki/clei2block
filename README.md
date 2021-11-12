@@ -208,7 +208,9 @@ You can programmatically download data and models via Synapse API client
 ### Access to ROSMAP brain data
 The RNA-seq and protein data used for training models, the predicted proteome data, and the estimated pseudotimes are distributed under the controlled data restrictions with a requirement of the Data Use Agreement. The data can be requested at the RADC Resource Sharing Hub at www.radc.rush.edu. 
 
-### Script to run ROSMAP clei2block model
+### Compute principal components of transcriptome features 
+
+### Run ROSMAP clei2block model
 You can build or use ROSMAP clei2block model using `code/train.R` and `code/predict.R`.
 
 
