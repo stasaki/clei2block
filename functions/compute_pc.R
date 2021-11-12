@@ -1,7 +1,7 @@
 
 library(tidyverse)
 data_type="mRNA"
-res_pca <- readRDS(paste0("/mnt/new_disk/007_iPWAS/Analysis/01_model/Data/07_ml_data_v3/pca_",data_type,".rds"))
+res_pca <- readRDS(paste0("./pca/pca_",data_type,".rds"))
 
 
 compute_PCs = function(data,res_pca){
