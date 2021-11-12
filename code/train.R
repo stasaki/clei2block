@@ -9,7 +9,7 @@ library(tidyverse)
 
 # Please specify file location ####
 clei2block_loc = "./functions/" # available at https://github.com/stasaki/clei2block/functions/
-data_loc = "./Input_train_anonymous/" # available at https://www.synapse.org/#!Synapse:syn23667887
+data_loc = "./Input_train/" #  can be requested at the RADC Resource Sharing Hub at www.radc.rush.edu
 out_loc = "./ROSMAP_model-out/"
 python_loc = "/opt/anaconda3/bin/python" # depends on your enviroment
 
