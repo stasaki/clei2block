@@ -183,10 +183,13 @@ To apply a pre-trained model to the demo data through docker, run the following 
 The training of the model takes about 3 minutes. You will see the following outputs.
 
   * `prediction.npy`: predicted protein values stored as NumPy array
-  
-Download models trained with ROSMAP brain data
+
+
+How to use a pre-trained model with ROSMAP brain data
 ============
-The clei2block models for ROSMAP brain data are available at http://dx.doi.org/10.7303/syn23624037. 
+
+### Download models trained with ROSMAP brain data
+The clei2block models for ROSMAP brain data and input variable names are available at http://dx.doi.org/10.7303/syn23624037. 
 
 You can programmatically download data and models via Synapse API client
 
@@ -202,11 +205,10 @@ You can programmatically download data and models via Synapse API client
     synapse get -r syn26454410
     cd ..
     
-Access to ROSMAP brain data
-============
+### Access to ROSMAP brain data
 The RNA-seq and protein data used for training models, the predicted proteome data, and the estimated pseudotimes are distributed under the controlled data restrictions with a requirement of the Data Use Agreement. The data can be requested at the RADC Resource Sharing Hub at www.radc.rush.edu. 
 
-
+### Script to run ROSMAP clei2block model
 You can build or use ROSMAP clei2block model using `code/train.R` and `code/predict.R`.
 
 
