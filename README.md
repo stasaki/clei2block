@@ -30,6 +30,8 @@ Working on a demo data
 
 R notebook for this tutorial is available at `code/demo-code.html` and the expected outcome is `code/demo-code-expected-output.nb.html`
 
+Note that `demo-data/` is a small de-identified dataset (3,000 features x 270 samples) whose only purpose is to let you confirm that the code runs in your environment. Its identifiers are placeholders (`gene1`...`gene3000`, `protein1`...`protein3000`, `sample1`...`sample270`) and cannot be mapped back to real genes or proteins. The models written to `demo-out/` by this tutorial are likewise toy models and must not be used for inference — see [How to use a pre-trained model with ROSMAP brain data](#how-to-use-a-pre-trained-model-with-rosmap-brain-data) for the published models.
+
 ### Training model
 Change current working directory to clei2block
 
@@ -176,9 +178,23 @@ You can use a pre-trained model with the following command.
     
 The order of input variables must be identical to the input used to train the model. Also if you use multiple data files for the input of latent embedding or linear regression, the order of files in the command must be identical with the training.
 
+This requirement is strict, and it is not checked at runtime. `clei2block-predict.py` reads the input matrices positionally, with `pandas.read_csv(..., header=None)`, and never opens the `_row` or `_col` files — those exist only for your own bookkeeping. A matrix whose rows are in a different order from the training input, or which contains a different set of features, will run to completion without any error and return meaningless predictions.
+
+Build your matrices by explicitly matching on gene ID against the variable ID files (see the ROSMAP section below), and check the expected row counts against the model file before running.
+
+```python
+import torch
+sd = torch.load("trained_model_fold1_iter0.pt", map_location="cpu")
+sd["Q.fc1.weight"].shape[1]  # number of rows required in vae_x_*.txt.gz
+sd["P.fc3.weight"].shape[0]  # number of rows required in lr_x_*.txt.gz,
+                             # and number of proteins in prediction.npy
+```
+
 To apply a pre-trained model to the demo data through docker, run the following command.
 
     time docker run --rm --gpus all -v $(pwd)/../:/var  pytorch/pytorch:1.2-cuda10.0-cudnn7-runtime  /bin/bash -c "pip install pandas; python /var/functions/clei2block-predict.py /var/demo-data/test_ /var/demo-out-predict/ /var/demo-out/0/trained_model.pt mRNA mRNA"
+
+This example uses `demo-out/0/trained_model.pt`, which is a toy model trained on the de-identified demo data and is only meant to demonstrate the command. It is not the model published with the paper, and its input dimensions reflect the demo data rather than the dimensions reported in the Methods. The published models trained on ROSMAP brain data are distributed via Synapse — see the next section.
     
 The training of the model takes about 3 minutes. You will see the following outputs.
 
@@ -204,12 +220,16 @@ You can programmatically download data and models via Synapse API client
     cd Variable_IDs
     synapse get -r syn26454410
     cd ..
+
+`syn23624087` holds one subdirectory per feature set, named `<input features for linear regression>_<input features for latent embedding>` — for example `mRNA_mRNAPCA` or `all_utr`. Each subdirectory contains `trained_model_fold<1-10>_iter<0-4>.pt`. There are 12 feature sets in total, from 6 latent-embedding inputs (`mRNA`, `mRNAPCA`, `premRNA`, `premRNAPCA`, `utr`, `utrPCA`) crossed with 2 linear-regression inputs (`mRNA`, or `all` meaning mRNA + pre-mRNA + 3'UTR length). The published prediction is the mean over every fold and iteration of all 12; `code/predict.R` runs the full ensemble and averages it.
+
+`syn26454410` holds the identifiers that define the row order of the input matrices. These are what you need in order to satisfy the positional-matching requirement described above: they tell you which gene belongs on each row of `vae_x_*.txt.gz`, and which protein belongs on each row of `lr_x_*.txt.gz` and of the returned `prediction.npy`. Note that the latent-embedding input and the linear-regression input have different row spaces — the former is a transcriptional feature set (the most variable features, or PCs), while the latter has one row per output protein, holding the mRNA of the gene matched to that protein.
     
 ### Access to ROSMAP brain data
 The RNA-seq and protein data used for training models, the predicted proteome data, and the estimated pseudotimes are distributed under the controlled data restrictions with a requirement of the Data Use Agreement. The data can be requested at the RADC Resource Sharing Hub at www.radc.rush.edu. 
 
 ### Compute principal components (PCs) of transcriptome features 
-Files nessesary to compute PCs are stored at `./pca/` and `./functions/compute_pc.R`.
+Files nessesary to compute PCs are stored at `./pca/` and `./functions/compute_pc.R`. Each `pca/pca_*.rds` holds the training rotation matrix together with the per-gene centering and scaling factors, so external data are standardized exactly as they were during training before being projected. `compute_PCs()` matches genes by ID rather than by position, so the row order of the matrix you pass to it does not matter; genes absent from your data are dropped from the projection.
 
 ### Run ROSMAP clei2block model
 You can build or use ROSMAP clei2block model using `code/train.R` and `code/predict.R`.
